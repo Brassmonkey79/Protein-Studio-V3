@@ -331,26 +331,14 @@ def api_submit_bindcraft():
 #SBATCH --time=48:00:00
 #SBATCH --mem=32G
 
-# Clean environment to prevent Python conflicts
-unset PYTHONHOME
-unset PYTHONPATH
-export PATH=/usr/local/bin:/usr/bin:/bin
-
 # JAX environment fixes
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILATION_CACHE_DIR=/tmp/jax_cache_$SLURM_JOB_ID
 mkdir -p $JAX_COMPILATION_CACHE_DIR
 
-# Activate conda environment
-eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
-conda activate BindCraft
-
-# Ensure no leftover Python config
-unset PYTHONHOME
-unset PYTHONPATH
-
+# Run BindCraft via conda run (avoids shell activation issues)
 cd {bindcraft_path}
-python bindcraft.py \\
+{settings['conda_path']}/bin/conda run --no-capture-output -n BindCraft python bindcraft.py \\
     --settings {remote_dir}/settings.json \\
     --filters {bindcraft_path}/default_filter_settings.json \\
     --advanced {bindcraft_path}/default_advanced_settings.json
@@ -447,21 +435,9 @@ def api_submit_pepmlm():
 #SBATCH --time=12:00:00
 #SBATCH --mem=16G
 
-# Clean environment to prevent Python conflicts
-unset PYTHONHOME
-unset PYTHONPATH
-export PATH=/usr/local/bin:/usr/bin:/bin
-
-# Activate conda environment
-eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
-conda activate pepmlm
-
-# Ensure no leftover Python config
-unset PYTHONHOME
-unset PYTHONPATH
-
+# Run PepMLM via conda run (avoids shell activation issues)
 cd {pepmlm_path}
-python generate_peptides.py \\
+{settings['conda_path']}/bin/conda run --no-capture-output -n pepmlm python generate_peptides.py \\
     --pdb {remote_dir}/target.pdb \\
     --chain {target_chain} \\
     --target_residues {target_residues} \\
@@ -542,18 +518,13 @@ def api_submit_rfantibody():
 #SBATCH --time=24:00:00
 #SBATCH --mem=32G
 
-# Clean environment to prevent Python conflicts
+# Clean environment
 unset PYTHONHOME
 unset PYTHONPATH
-export PATH=/usr/local/bin:/usr/bin:/bin
 
-# Activate RFAntibody environment (uses uv)
+# Run RFAntibody via uv venv
 cd {rfantibody_path}
 source .venv/bin/activate
-
-# Ensure no leftover Python config
-unset PYTHONHOME
-unset PYTHONPATH
 
 python run_inference.py \\
     --pdb {remote_dir}/target.pdb \\
@@ -633,21 +604,9 @@ def api_submit_proteinmpnn():
 #SBATCH --time=4:00:00
 #SBATCH --mem=16G
 
-# Clean environment to prevent Python conflicts
-unset PYTHONHOME
-unset PYTHONPATH
-export PATH=/usr/local/bin:/usr/bin:/bin
-
-# Activate conda environment
-eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
-conda activate proteinmpnn
-
-# Ensure no leftover Python config
-unset PYTHONHOME
-unset PYTHONPATH
-
+# Run ProteinMPNN via conda run (avoids shell activation issues)
 cd {mpnn_path}
-python protein_mpnn_run.py \\
+{settings['conda_path']}/bin/conda run --no-capture-output -n proteinmpnn python protein_mpnn_run.py \\
     --pdb_path {remote_dir}/target.pdb \\
     --chains_to_design "{chains_to_design}" \\
     --fixed_residues "{fixed_residues}" \\
