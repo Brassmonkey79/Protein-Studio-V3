@@ -1335,6 +1335,8 @@ document.addEventListener('DOMContentLoaded', async function () {
     const found = await detectApiServer();
     if (found) {
         loadServerSettings();
+        loadJobs();
+        startAutoRefresh();
     } else {
         setStatus('srvStatus',
             'No local server detected. Run ProteinDesignStudioV3.exe or "python server.py" to enable SSH features.',
@@ -1645,11 +1647,7 @@ function escHtml(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-// Start auto-refresh when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    loadJobs();
-    startAutoRefresh();
-});
+// Jobs are loaded after API server detection completes (see app_server.js)
 
 
 </script>

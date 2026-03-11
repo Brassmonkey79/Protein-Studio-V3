@@ -44,7 +44,7 @@ UPLOAD_DIR = SETTINGS_DIR / 'uploads'
 DEFAULT_SETTINGS = {
     'host': '',
     'username': '',
-    'key_path': str(Path.home() / '.ssh' / 'id_ed25519'),
+    'key_path': str(Path.home() / '.ssh' / 'id_rsa'),
     'remote_base': '',
     'partition': '',
     'gpu_type': '',
