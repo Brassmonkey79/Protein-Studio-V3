@@ -331,16 +331,23 @@ def api_submit_bindcraft():
 #SBATCH --time=48:00:00
 #SBATCH --mem=32G
 
+# Clean environment to prevent Python conflicts
+unset PYTHONHOME
+unset PYTHONPATH
+export PATH=/usr/local/bin:/usr/bin:/bin
+
 # JAX environment fixes
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 export JAX_COMPILATION_CACHE_DIR=/tmp/jax_cache_$SLURM_JOB_ID
 mkdir -p $JAX_COMPILATION_CACHE_DIR
 
-# Activate environment
+# Activate conda environment
+eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
+conda activate BindCraft
+
+# Ensure no leftover Python config
 unset PYTHONHOME
 unset PYTHONPATH
-source {settings['conda_path']}/etc/profile.d/conda.sh
-conda activate BindCraft
 
 cd {bindcraft_path}
 python bindcraft.py \\
@@ -440,13 +447,18 @@ def api_submit_pepmlm():
 #SBATCH --time=12:00:00
 #SBATCH --mem=16G
 
-# Clean environment
+# Clean environment to prevent Python conflicts
 unset PYTHONHOME
 unset PYTHONPATH
+export PATH=/usr/local/bin:/usr/bin:/bin
 
-# Activate environment
-source {settings['conda_path']}/etc/profile.d/conda.sh
+# Activate conda environment
+eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
 conda activate pepmlm
+
+# Ensure no leftover Python config
+unset PYTHONHOME
+unset PYTHONPATH
 
 cd {pepmlm_path}
 python generate_peptides.py \\
@@ -530,13 +542,18 @@ def api_submit_rfantibody():
 #SBATCH --time=24:00:00
 #SBATCH --mem=32G
 
-# Clean environment
+# Clean environment to prevent Python conflicts
 unset PYTHONHOME
 unset PYTHONPATH
+export PATH=/usr/local/bin:/usr/bin:/bin
 
 # Activate RFAntibody environment (uses uv)
 cd {rfantibody_path}
 source .venv/bin/activate
+
+# Ensure no leftover Python config
+unset PYTHONHOME
+unset PYTHONPATH
 
 python run_inference.py \\
     --pdb {remote_dir}/target.pdb \\
@@ -616,13 +633,18 @@ def api_submit_proteinmpnn():
 #SBATCH --time=4:00:00
 #SBATCH --mem=16G
 
-# Clean environment
+# Clean environment to prevent Python conflicts
 unset PYTHONHOME
 unset PYTHONPATH
+export PATH=/usr/local/bin:/usr/bin:/bin
 
-# Activate environment
-source {settings['conda_path']}/etc/profile.d/conda.sh
+# Activate conda environment
+eval "$({settings['conda_path']}/bin/conda shell.bash hook)"
 conda activate proteinmpnn
+
+# Ensure no leftover Python config
+unset PYTHONHOME
+unset PYTHONPATH
 
 cd {mpnn_path}
 python protein_mpnn_run.py \\
