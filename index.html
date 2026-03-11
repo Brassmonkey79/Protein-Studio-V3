@@ -716,6 +716,24 @@ input[type="range"]::-webkit-slider-thumb {
           <input type="text" id="srvBindcraft" style="width:100%">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>PepMLM Path</label>
+          <input type="text" id="srvPepmlm" style="width:100%">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>RFAntibody Path</label>
+          <input type="text" id="srvRfantibody" style="width:100%">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>ProteinMPNN Path</label>
+          <input type="text" id="srvMpnn" style="width:100%">
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:12px">
       <button class="btn btn-primary" onclick="saveServerSettings()">&#x1F4BE; Save Settings</button>
@@ -1271,6 +1289,9 @@ async function loadServerSettings() {
         document.getElementById('srvGpu').value = data.gpu_type || 'gpu:1';
         document.getElementById('srvConda').value = data.conda_path || '';
         document.getElementById('srvBindcraft').value = data.bindcraft_path || '';
+        document.getElementById('srvPepmlm').value = data.pepmlm_path || '';
+        document.getElementById('srvRfantibody').value = data.rfantibody_path || '';
+        document.getElementById('srvMpnn').value = data.mpnn_path || '';
         setStatus('srvStatus', 'Settings loaded.', 'info');
     } catch (e) {
         setStatus('srvStatus', 'Could not load settings: ' + e.message, 'error');
@@ -1287,6 +1308,9 @@ async function saveServerSettings() {
         gpu_type: document.getElementById('srvGpu').value.trim(),
         conda_path: document.getElementById('srvConda').value.trim(),
         bindcraft_path: document.getElementById('srvBindcraft').value.trim(),
+        pepmlm_path: document.getElementById('srvPepmlm').value.trim(),
+        rfantibody_path: document.getElementById('srvRfantibody').value.trim(),
+        mpnn_path: document.getElementById('srvMpnn').value.trim(),
     };
     try {
         await apiPost('/api/settings', data);
