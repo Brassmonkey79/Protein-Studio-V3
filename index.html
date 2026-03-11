@@ -669,23 +669,23 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>Server Host</label>
-          <input type="text" id="srvHost" placeholder="your-cluster-hostname" style="width:100%">
+          <input type="text" id="srvHost" style="width:100%">
         </div>
         <div class="form-group">
           <label>Username</label>
-          <input type="text" id="srvUser" placeholder="your_username" style="width:140px" oninput="srvAutoUpdateWorkDir()">
+          <input type="text" id="srvUser" style="width:140px" oninput="srvAutoUpdateWorkDir()">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>SSH Private Key Path</label>
-          <input type="text" id="srvKey" placeholder="~/.ssh/id_ed25519" style="width:100%">
+          <input type="text" id="srvKey" style="width:100%">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>Remote Working Directory <span style="font-weight:400;color:var(--text-muted);font-size:9px">(auto-set from username)</span></label>
-          <input type="text" id="srvRemoteBase" placeholder="/home/username/binder_design" style="width:100%">
+          <input type="text" id="srvRemoteBase" style="width:100%">
         </div>
       </div>
     </div>
@@ -694,11 +694,11 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="form-row">
         <div class="form-group">
           <label>Partition</label>
-          <input type="text" id="srvPartition" value="gpu" style="width:120px">
+          <input type="text" id="srvPartition" style="width:120px">
         </div>
         <div class="form-group">
           <label>GPU Resource</label>
-          <input type="text" id="srvGpu" value="gpu:1" style="width:120px">
+          <input type="text" id="srvGpu" style="width:120px">
         </div>
       </div>
     </div>
@@ -707,13 +707,13 @@ input[type="range"]::-webkit-slider-thumb {
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>Conda Installation</label>
-          <input type="text" id="srvConda" placeholder="/opt/conda" style="width:100%">
+          <input type="text" id="srvConda" style="width:100%">
         </div>
       </div>
       <div class="form-row">
         <div class="form-group" style="flex:1">
           <label>BindCraft Path</label>
-          <input type="text" id="srvBindcraft" placeholder="/home/username/BindCraft" style="width:100%">
+          <input type="text" id="srvBindcraft" style="width:100%">
         </div>
       </div>
     </div>
