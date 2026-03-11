@@ -338,7 +338,7 @@ mkdir -p $JAX_COMPILATION_CACHE_DIR
 
 # Activate environment
 source {settings['conda_path']}/etc/profile.d/conda.sh
-conda activate {bindcraft_path}/bindcraft_env 2>/dev/null || conda activate bindcraft
+conda activate BindCraft
 
 cd {bindcraft_path}
 python bindcraft.py \\
