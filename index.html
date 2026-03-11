@@ -736,7 +736,10 @@ input[type="range"]::-webkit-slider-thumb {
 //  V3 Core — Page Navigation + Utilities
 // ═══════════════════════════════════════════════════════════════
 
-const API_BASE = '';
+// API base URL — auto-detected on startup
+// When served by Flask (localhost), this stays empty (relative URLs).
+// When served by GitHub Pages, this points to http://localhost:5000.
+let API_BASE = '';
 
 // ─── Page Navigation ─────────────────────────────────────────
 function showPage(name) {
@@ -788,6 +791,43 @@ function updateConnectionBadge(connected) {
         badge.textContent = connected ? '● Connected' : '○ Disconnected';
         badge.className = 'conn-badge ' + (connected ? 'conn-ok' : 'conn-off');
     }
+}
+
+// ─── Auto-detect local companion server ──────────────────────
+// On startup, try to reach the local Flask server.
+// If we're already on localhost:5000 (served by Flask), API_BASE stays ''.
+// If we're on GitHub Pages (or any other host), try http://localhost:5000.
+async function detectApiServer() {
+    const isLocal = window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1';
+
+    if (isLocal) {
+        // Already served by Flask — use relative URLs
+        API_BASE = '';
+        updateConnectionBadge(true);
+        return true;
+    }
+
+    // Try connecting to the local companion server
+    try {
+        const res = await fetch('http://localhost:5000/api/ping', {
+            method: 'GET',
+            mode: 'cors',
+            signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+            API_BASE = 'http://localhost:5000';
+            updateConnectionBadge(true);
+            console.log('API: Connected to local companion server');
+            return true;
+        }
+    } catch (e) {
+        // Server not running
+    }
+
+    updateConnectionBadge(false);
+    console.log('API: No local server detected. Viewer-only mode.');
+    return false;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1290,8 +1330,17 @@ function srvAutoUpdateWorkDir() {
     }
 }
 
-// Auto-load settings on page init
-document.addEventListener('DOMContentLoaded', loadServerSettings);
+// Auto-detect server + load settings on page init
+document.addEventListener('DOMContentLoaded', async function () {
+    const found = await detectApiServer();
+    if (found) {
+        loadServerSettings();
+    } else {
+        setStatus('srvStatus',
+            'No local server detected. Run ProteinDesignStudioV3.exe or "python server.py" to enable SSH features.',
+            'warning');
+    }
+});
 
 // ═══════════════════════════════════════════════════════════════
 //  BindCraft — Protein Binder Design
