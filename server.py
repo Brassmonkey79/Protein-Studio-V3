@@ -337,6 +337,8 @@ export JAX_COMPILATION_CACHE_DIR=/tmp/jax_cache_$SLURM_JOB_ID
 mkdir -p $JAX_COMPILATION_CACHE_DIR
 
 # Activate environment
+unset PYTHONHOME
+unset PYTHONPATH
 source {settings['conda_path']}/etc/profile.d/conda.sh
 conda activate BindCraft
 
@@ -401,19 +403,272 @@ python bindcraft.py \\
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
-# ─── Placeholder submit endpoints for future tools ────────────
+# ─── PepMLM Submit ────────────────────────────────────────────
 
 @app.route('/api/submit/pepmlm', methods=['POST'])
 def api_submit_pepmlm():
-    return jsonify({'status': 'error', 'message': 'PepMLM integration coming soon. Program must be installed on the cluster first.'}), 501
+    data = request.get_json()
+    settings = get_settings()
+
+    # Validate required settings
+    missing = []
+    if not settings.get('host'): missing.append('Server Host')
+    if not settings.get('username'): missing.append('Username')
+    if not settings.get('partition'): missing.append('Partition')
+    if not settings.get('remote_base'): missing.append('Remote Working Directory')
+    if not settings.get('pepmlm_path'): missing.append('PepMLM Path')
+    if missing:
+        return jsonify({'status': 'error', 'message': f'Missing required settings: {", ".join(missing)}. Go to Server Settings to configure.'}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    job_name = data.get('job_name', f'pepmlm_{job_id}')
+    target_pdb = data.get('target_pdb', '')
+    target_chain = data.get('target_chain', 'A')
+    target_residues = data.get('target_residues', '')
+    peptide_length = data.get('peptide_length', 15)
+    num_designs = data.get('num_designs', 10)
+
+    remote_dir = f"{settings['remote_base']}/jobs/{job_name}"
+    pepmlm_path = settings['pepmlm_path']
+
+    slurm_script = f"""#!/bin/bash
+#SBATCH --job-name={job_name}
+#SBATCH --partition={settings['partition']}
+#SBATCH --gres={settings['gpu_type']}
+#SBATCH --output={remote_dir}/slurm_%j.out
+#SBATCH --error={remote_dir}/slurm_%j.err
+#SBATCH --time=12:00:00
+#SBATCH --mem=16G
+
+# Clean environment
+unset PYTHONHOME
+unset PYTHONPATH
+
+# Activate environment
+source {settings['conda_path']}/etc/profile.d/conda.sh
+conda activate pepmlm
+
+cd {pepmlm_path}
+python generate_peptides.py \\
+    --pdb {remote_dir}/target.pdb \\
+    --chain {target_chain} \\
+    --target_residues {target_residues} \\
+    --peptide_length {peptide_length} \\
+    --num_designs {num_designs} \\
+    --output_dir {remote_dir}/results
+"""
+
+    try:
+        # Create remote directory and upload files
+        ssh_exec(f'mkdir -p {remote_dir}')
+        if target_pdb:
+            scp_upload(target_pdb, f'{remote_dir}/target.pdb')
+
+        # Write and submit SLURM script
+        ssh_exec(f"cat > {remote_dir}/run.sh << 'SLURM_EOF'\n{slurm_script}\nSLURM_EOF")
+        stdout, stderr, code = ssh_exec(f'sbatch {remote_dir}/run.sh')
+        slurm_id = stdout.strip().split()[-1] if 'Submitted' in stdout else None
+
+        job = add_job({
+            'id': job_id,
+            'name': job_name,
+            'tool': 'PepMLM',
+            'status': 'PENDING',
+            'slurm_id': slurm_id,
+            'remote_dir': remote_dir,
+            'submitted_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'params': {
+                'target_chain': target_chain,
+                'target_residues': target_residues,
+                'peptide_length': peptide_length,
+                'num_designs': num_designs,
+            }
+        })
+
+        return jsonify({
+            'status': 'ok',
+            'job': job,
+            'message': f'Submitted SLURM job {slurm_id}' if slurm_id else 'Submit error: ' + stderr
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ─── RFAntibody Submit ────────────────────────────────────────
 
 @app.route('/api/submit/rfantibody', methods=['POST'])
 def api_submit_rfantibody():
-    return jsonify({'status': 'error', 'message': 'RFAntibody integration coming soon. Program must be installed on the cluster first.'}), 501
+    data = request.get_json()
+    settings = get_settings()
+
+    # Validate required settings
+    missing = []
+    if not settings.get('host'): missing.append('Server Host')
+    if not settings.get('username'): missing.append('Username')
+    if not settings.get('partition'): missing.append('Partition')
+    if not settings.get('remote_base'): missing.append('Remote Working Directory')
+    if not settings.get('rfantibody_path'): missing.append('RFAntibody Path')
+    if missing:
+        return jsonify({'status': 'error', 'message': f'Missing required settings: {", ".join(missing)}. Go to Server Settings to configure.'}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    job_name = data.get('job_name', f'rfantibody_{job_id}')
+    target_pdb = data.get('target_pdb', '')
+    epitope_residues = data.get('epitope_residues', '')
+    antibody_type = data.get('antibody_type', 'nanobody')
+    num_designs = data.get('num_designs', 10)
+
+    remote_dir = f"{settings['remote_base']}/jobs/{job_name}"
+    rfantibody_path = settings['rfantibody_path']
+
+    slurm_script = f"""#!/bin/bash
+#SBATCH --job-name={job_name}
+#SBATCH --partition={settings['partition']}
+#SBATCH --gres={settings['gpu_type']}
+#SBATCH --output={remote_dir}/slurm_%j.out
+#SBATCH --error={remote_dir}/slurm_%j.err
+#SBATCH --time=24:00:00
+#SBATCH --mem=32G
+
+# Clean environment
+unset PYTHONHOME
+unset PYTHONPATH
+
+# Activate RFAntibody environment (uses uv)
+cd {rfantibody_path}
+source .venv/bin/activate
+
+python run_inference.py \\
+    --pdb {remote_dir}/target.pdb \\
+    --epitope "{epitope_residues}" \\
+    --antibody_type {antibody_type} \\
+    --num_designs {num_designs} \\
+    --output_dir {remote_dir}/results
+"""
+
+    try:
+        ssh_exec(f'mkdir -p {remote_dir}')
+        if target_pdb:
+            scp_upload(target_pdb, f'{remote_dir}/target.pdb')
+
+        ssh_exec(f"cat > {remote_dir}/run.sh << 'SLURM_EOF'\n{slurm_script}\nSLURM_EOF")
+        stdout, stderr, code = ssh_exec(f'sbatch {remote_dir}/run.sh')
+        slurm_id = stdout.strip().split()[-1] if 'Submitted' in stdout else None
+
+        job = add_job({
+            'id': job_id,
+            'name': job_name,
+            'tool': 'RFAntibody',
+            'status': 'PENDING',
+            'slurm_id': slurm_id,
+            'remote_dir': remote_dir,
+            'submitted_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'params': {
+                'epitope_residues': epitope_residues,
+                'antibody_type': antibody_type,
+                'num_designs': num_designs,
+            }
+        })
+
+        return jsonify({
+            'status': 'ok',
+            'job': job,
+            'message': f'Submitted SLURM job {slurm_id}' if slurm_id else 'Submit error: ' + stderr
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# ─── ProteinMPNN Submit ──────────────────────────────────────
 
 @app.route('/api/submit/proteinmpnn', methods=['POST'])
 def api_submit_proteinmpnn():
-    return jsonify({'status': 'error', 'message': 'ProteinMPNN integration coming soon. Program must be installed on the cluster first.'}), 501
+    data = request.get_json()
+    settings = get_settings()
+
+    # Validate required settings
+    missing = []
+    if not settings.get('host'): missing.append('Server Host')
+    if not settings.get('username'): missing.append('Username')
+    if not settings.get('partition'): missing.append('Partition')
+    if not settings.get('remote_base'): missing.append('Remote Working Directory')
+    if not settings.get('mpnn_path'): missing.append('ProteinMPNN Path')
+    if missing:
+        return jsonify({'status': 'error', 'message': f'Missing required settings: {", ".join(missing)}. Go to Server Settings to configure.'}), 400
+
+    job_id = str(uuid.uuid4())[:8]
+    job_name = data.get('job_name', f'mpnn_{job_id}')
+    target_pdb = data.get('target_pdb', '')
+    chains_to_design = data.get('chains_to_design', '')
+    fixed_residues = data.get('fixed_residues', '')
+    num_sequences = data.get('num_sequences', 10)
+    sampling_temp = data.get('sampling_temp', '0.1')
+
+    remote_dir = f"{settings['remote_base']}/jobs/{job_name}"
+    mpnn_path = settings['mpnn_path']
+
+    slurm_script = f"""#!/bin/bash
+#SBATCH --job-name={job_name}
+#SBATCH --partition={settings['partition']}
+#SBATCH --gres={settings['gpu_type']}
+#SBATCH --output={remote_dir}/slurm_%j.out
+#SBATCH --error={remote_dir}/slurm_%j.err
+#SBATCH --time=4:00:00
+#SBATCH --mem=16G
+
+# Clean environment
+unset PYTHONHOME
+unset PYTHONPATH
+
+# Activate environment
+source {settings['conda_path']}/etc/profile.d/conda.sh
+conda activate proteinmpnn
+
+cd {mpnn_path}
+python protein_mpnn_run.py \\
+    --pdb_path {remote_dir}/target.pdb \\
+    --chains_to_design "{chains_to_design}" \\
+    --fixed_residues "{fixed_residues}" \\
+    --num_seq_per_target {num_sequences} \\
+    --sampling_temp {sampling_temp} \\
+    --out_folder {remote_dir}/results \\
+    --seed 42
+"""
+
+    try:
+        ssh_exec(f'mkdir -p {remote_dir}')
+        if target_pdb:
+            scp_upload(target_pdb, f'{remote_dir}/target.pdb')
+
+        ssh_exec(f"cat > {remote_dir}/run.sh << 'SLURM_EOF'\n{slurm_script}\nSLURM_EOF")
+        stdout, stderr, code = ssh_exec(f'sbatch {remote_dir}/run.sh')
+        slurm_id = stdout.strip().split()[-1] if 'Submitted' in stdout else None
+
+        job = add_job({
+            'id': job_id,
+            'name': job_name,
+            'tool': 'ProteinMPNN',
+            'status': 'PENDING',
+            'slurm_id': slurm_id,
+            'remote_dir': remote_dir,
+            'submitted_at': time.strftime('%Y-%m-%d %H:%M:%S'),
+            'params': {
+                'chains_to_design': chains_to_design,
+                'fixed_residues': fixed_residues,
+                'num_sequences': num_sequences,
+                'sampling_temp': sampling_temp,
+            }
+        })
+
+        return jsonify({
+            'status': 'ok',
+            'job': job,
+            'message': f'Submitted SLURM job {slurm_id}' if slurm_id else 'Submit error: ' + stderr
+        })
+
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 
 # ─── Main ─────────────────────────────────────────────────────
 
