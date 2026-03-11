@@ -415,6 +415,7 @@ input[type="range"]::-webkit-slider-thumb {
             <button class="rep-btn active" id="bcRep-cartoon" onclick="viewerSetRep('bc','cartoon')">Ribbon</button>
             <button class="rep-btn" id="bcRep-ball+stick" onclick="viewerSetRep('bc','ball+stick')">Atom</button>
             <button class="rep-btn" id="bcRep-surface" onclick="viewerSetRep('bc','surface')">Surface</button>
+            <button class="rep-btn" id="bcRep-spacefill" onclick="viewerSetRep('bc','spacefill')">Spheres</button>
             <button class="rep-btn" onclick="viewerClearSelection('bc')" style="margin-left:auto;color:var(--highlight)">Clear Selection</button>
           </div>
           <div class="ngl-viewport" id="bcViewport"></div>
@@ -494,6 +495,7 @@ input[type="range"]::-webkit-slider-thumb {
             <button class="rep-btn active" id="pepRep-cartoon" onclick="viewerSetRep('pep','cartoon')">Ribbon</button>
             <button class="rep-btn" id="pepRep-ball+stick" onclick="viewerSetRep('pep','ball+stick')">Atom</button>
             <button class="rep-btn" id="pepRep-surface" onclick="viewerSetRep('pep','surface')">Surface</button>
+            <button class="rep-btn" id="pepRep-spacefill" onclick="viewerSetRep('pep','spacefill')">Spheres</button>
             <button class="rep-btn" onclick="viewerClearSelection('pep')" style="margin-left:auto;color:var(--highlight)">Clear Selection</button>
           </div>
           <div class="ngl-viewport" id="pepViewport"></div>
@@ -547,6 +549,7 @@ input[type="range"]::-webkit-slider-thumb {
             <button class="rep-btn active" id="rfRep-cartoon" onclick="viewerSetRep('rf','cartoon')">Ribbon</button>
             <button class="rep-btn" id="rfRep-ball+stick" onclick="viewerSetRep('rf','ball+stick')">Atom</button>
             <button class="rep-btn" id="rfRep-surface" onclick="viewerSetRep('rf','surface')">Surface</button>
+            <button class="rep-btn" id="rfRep-spacefill" onclick="viewerSetRep('rf','spacefill')">Spheres</button>
             <button class="rep-btn" onclick="viewerClearSelection('rf')" style="margin-left:auto;color:var(--highlight)">Clear Selection</button>
           </div>
           <div class="ngl-viewport" id="rfViewport"></div>
@@ -603,6 +606,7 @@ input[type="range"]::-webkit-slider-thumb {
             <button class="rep-btn active" id="mpnnRep-cartoon" onclick="viewerSetRep('mpnn','cartoon')">Ribbon</button>
             <button class="rep-btn" id="mpnnRep-ball+stick" onclick="viewerSetRep('mpnn','ball+stick')">Atom</button>
             <button class="rep-btn" id="mpnnRep-surface" onclick="viewerSetRep('mpnn','surface')">Surface</button>
+            <button class="rep-btn" id="mpnnRep-spacefill" onclick="viewerSetRep('mpnn','spacefill')">Spheres</button>
             <button class="rep-btn" onclick="viewerClearSelection('mpnn')" style="margin-left:auto;color:var(--highlight)">Clear Selection</button>
           </div>
           <div class="ngl-viewport" id="mpnnViewport"></div>
@@ -874,11 +878,37 @@ function viewerInit(pageId, hotspotFieldId) {
     // Only fire if the mouse didn't move (i.e., it was a clean click, not a drag)
     state.stage.signals.clicked.add(function (pickingProxy) {
         if (_dragActive) return; // Ignore if user was dragging
-        if (!pickingProxy || !pickingProxy.atom) return;
+        if (!pickingProxy) return;
 
-        const atom = pickingProxy.atom;
-        const chain = atom.chainname;
-        const resno = atom.resno;
+        // Extract atom info from various picking types:
+        // - Ribbon/Ball+Stick: pickingProxy.atom
+        // - Surface: pickingProxy.closestBondAtom or pickingProxy.volume data
+        let chain = null, resno = null;
+
+        if (pickingProxy.atom) {
+            chain = pickingProxy.atom.chainname;
+            resno = pickingProxy.atom.resno;
+        } else if (pickingProxy.closestBondAtom) {
+            chain = pickingProxy.closestBondAtom.chainname;
+            resno = pickingProxy.closestBondAtom.resno;
+        } else if (pickingProxy.surface) {
+            // Surface picks — find nearest atom via position
+            const pos = pickingProxy.position;
+            if (pos && state.component) {
+                let minDist = Infinity;
+                state.component.structure.eachAtom(ap => {
+                    const dx = ap.x - pos.x, dy = ap.y - pos.y, dz = ap.z - pos.z;
+                    const d = dx * dx + dy * dy + dz * dz;
+                    if (d < minDist) {
+                        minDist = d;
+                        chain = ap.chainname;
+                        resno = ap.resno;
+                    }
+                });
+            }
+        }
+
+        if (chain === null || resno === null) return;
         const key = chain + ':' + resno;
 
         // Toggle this residue
@@ -952,6 +982,7 @@ function viewerLoadPDBText(pageId, pdbText) {
 /**
  * Apply structure representation
  * - Surface: Kyte-Doolittle hydrophobicity (teal → white → amber)
+ *            + hidden atom layer for click picking (NGL surfaces aren't pickable)
  * - Ribbon/Atom: uniform cyan
  */
 function viewerApplyRep(state, mode) {
@@ -961,6 +992,13 @@ function viewerApplyRep(state, mode) {
             colorScale: [STRUCTURE_COLOR, '#e8e8e8', '#e8883a'],
             surfaceType: 'sas',
             opacity: 0.85,
+        });
+    } else if (mode === 'spacefill') {
+        // Spheres: van der Waals radii with hydrophobicity coloring — pickable!
+        state.component.addRepresentation('spacefill', {
+            colorScheme: 'hydrophobicity',
+            colorScale: [STRUCTURE_COLOR, '#e8e8e8', '#e8883a'],
+            opacity: 1.0,
         });
     } else {
         state.component.addRepresentation(mode, {
@@ -1000,6 +1038,13 @@ function viewerApplyHighlight(state) {
             opacity: 0.95,
             surfaceType: 'sas',
         });
+    } else if (mode === 'spacefill') {
+        state.highlightRepr = state.component.addRepresentation('spacefill', {
+            sele: sel,
+            colorScheme: 'uniform',
+            colorValue: HIGHLIGHT_COLOR,
+            opacity: 1.0,
+        });
     } else if (mode === 'ball+stick') {
         state.highlightRepr = state.component.addRepresentation('ball+stick', {
             sele: sel,
@@ -1033,7 +1078,7 @@ function viewerSetRep(pageId, mode) {
 }
 
 function viewerUpdateRepButtons(state) {
-    ['cartoon', 'ball+stick', 'surface'].forEach(m => {
+    ['cartoon', 'ball+stick', 'surface', 'spacefill'].forEach(m => {
         const btn = document.getElementById(state.pageId + 'Rep-' + m);
         if (btn) btn.classList.toggle('active', m === state.currentRep);
     });
