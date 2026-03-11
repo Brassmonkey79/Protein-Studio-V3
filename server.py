@@ -275,6 +275,16 @@ def api_submit_bindcraft():
     data = request.get_json()
     settings = get_settings()
 
+    # Validate required settings
+    missing = []
+    if not settings.get('host'): missing.append('Server Host')
+    if not settings.get('username'): missing.append('Username')
+    if not settings.get('partition'): missing.append('Partition')
+    if not settings.get('remote_base'): missing.append('Remote Working Directory')
+    if not settings.get('bindcraft_path'): missing.append('BindCraft Path')
+    if missing:
+        return jsonify({'status': 'error', 'message': f'Missing required settings: {", ".join(missing)}. Go to Server Settings to configure.'}), 400
+
     job_id = str(uuid.uuid4())[:8]
     job_name = data.get('job_name', f'bindcraft_{job_id}')
     target_pdb = data.get('target_pdb', '')
@@ -405,48 +415,6 @@ def api_submit_rfantibody():
 def api_submit_proteinmpnn():
     return jsonify({'status': 'error', 'message': 'ProteinMPNN integration coming soon. Program must be installed on the cluster first.'}), 501
 
-# ─── First-Run Setup ──────────────────────────────────────────
-
-def first_run_setup():
-    """Interactive setup for new users. Runs once when no settings exist."""
-    settings = get_settings()
-
-    # Check if required fields are configured
-    if settings.get('host') and settings.get('username'):
-        return  # Already configured
-
-    print()
-    print("  ┌─────────────────────────────────────────────┐")
-    print("  │         First-Time Setup                    │")
-    print("  │  Configure your cluster connection below.   │")
-    print("  │  Press Enter to accept defaults in [brackets]. │")
-    print("  └─────────────────────────────────────────────┘")
-    print()
-
-    host = input(f"  Cluster hostname []: ").strip()
-    username = input(f"  SSH username []: ").strip()
-
-    default_key = str(Path.home() / '.ssh' / 'id_ed25519')
-    key_path = input(f"  SSH key path [{default_key}]: ").strip() or default_key
-
-    default_remote = f'/home/{username}/binder_design' if username else ''
-    remote_base = input(f"  Remote working directory [{default_remote}]: ").strip() or default_remote
-
-    # Save settings
-    settings.update({
-        'host': host,
-        'username': username,
-        'key_path': key_path,
-        'remote_base': remote_base,
-    })
-    save_settings(settings)
-
-    print()
-    print(f"  ✓ Settings saved to {SETTINGS_FILE}")
-    print("  You can change these anytime in Server Settings.")
-    print()
-
-
 # ─── Main ─────────────────────────────────────────────────────
 
 if __name__ == '__main__':
@@ -456,10 +424,8 @@ if __name__ == '__main__':
     print("=" * 60)
     print("  Protein Design Studio V3 — Binder Design Edition")
     print(f"  Open http://localhost:{port} in your browser")
+    print("  Configure your settings in Server Settings.")
     print("=" * 60)
-
-    # First-run setup for new users
-    first_run_setup()
 
     # Auto-open browser when running as packaged app
     if is_frozen:
